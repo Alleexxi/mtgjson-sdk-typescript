@@ -899,19 +899,19 @@ async function main(): Promise<boolean> {
 					);
 				}
 
-				// today — with category filter
-				const categories = new Set(
-					todayPrices.map((r) => r.category as string),
+				// today — with priceType filter
+				const priceTypes = new Set(
+					todayPrices.map((r) => r.price_type as string),
 				);
-				if (categories.size > 0) {
-					const firstCat = [...categories][0];
-					const todayCat = await sdk.prices.today(uuid, {
-						category: firstCat,
+				if (priceTypes.size > 0) {
+					const firstPt = [...priceTypes][0];
+					const todayPt = await sdk.prices.today(uuid, {
+						priceType: firstPt,
 					});
 					check(
-						"prices.today category filter",
-						todayCat.length > 0,
-						`cat=${firstCat}`,
+						"prices.today priceType filter",
+						todayPt.length > 0,
+						`priceType=${firstPt}`,
 					);
 				}
 			}
@@ -1014,7 +1014,7 @@ async function main(): Promise<boolean> {
 	// Access internal connection to check if prices are loaded
 	const conn = (sdk as unknown as { _conn: { _registeredViews: Set<string> } })
 		._conn;
-	if (conn._registeredViews.has("prices_today")) {
+	if (conn._registeredViews.has("all_prices_today")) {
 		const fin = await sdk.sets.getFinancialSummary("MH3");
 		check(
 			"getFinancialSummary MH3",

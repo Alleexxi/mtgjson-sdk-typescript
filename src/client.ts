@@ -64,7 +64,7 @@ export class MtgjsonSDK {
 	}
 
 	get prices(): PriceQuery {
-		if (!this._prices) this._prices = new PriceQuery(this._conn, this._cache);
+		if (!this._prices) this._prices = new PriceQuery(this._conn);
 		return this._prices;
 	}
 
@@ -79,7 +79,7 @@ export class MtgjsonSDK {
 	}
 
 	get skus(): SkuQuery {
-		if (!this._skus) this._skus = new SkuQuery(this._conn, this._cache);
+		if (!this._skus) this._skus = new SkuQuery(this._conn);
 		return this._skus;
 	}
 
