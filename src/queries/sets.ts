@@ -79,16 +79,15 @@ export class SetQuery {
 			provider?: string;
 			currency?: string;
 			finish?: string;
-			category?: string;
+			priceType?: string;
 		},
 	): Promise<Record<string, unknown> | null> {
-		await this._conn.ensureViews("cards");
-		if (!this._conn._registeredViews.has("prices_today")) return null;
+		await this._conn.ensureViews("cards", "all_prices_today");
 
 		const provider = options?.provider ?? "tcgplayer";
 		const currency = options?.currency ?? "USD";
 		const finish = options?.finish ?? "normal";
-		const category = options?.category ?? "retail";
+		const priceType = options?.priceType ?? "retail";
 
 		const sql = `
 			SELECT
@@ -99,20 +98,20 @@ export class SetQuery {
 				MAX(p.price) AS max_price,
 				MAX(p.date) AS date
 			FROM cards c
-			JOIN prices_today p ON c.uuid = p.uuid
+			JOIN all_prices_today p ON c.uuid = p.uuid
 			WHERE c.setCode = $1
 			  AND p.provider = $2
 			  AND p.currency = $3
 			  AND p.finish = $4
-			  AND p.category = $5
-			  AND p.date = (SELECT MAX(p2.date) FROM prices_today p2)
+			  AND p.price_type = $5
+			  AND p.date = (SELECT MAX(p2.date) FROM all_prices_today p2)
 		`;
 		const rows = await this._conn.execute(sql, [
 			setCode.toUpperCase(),
 			provider,
 			currency,
 			finish,
-			category,
+			priceType,
 		]);
 		if (!rows.length || (rows[0].card_count as number) === 0) return null;
 		return rows[0];
