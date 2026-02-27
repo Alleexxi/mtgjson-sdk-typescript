@@ -452,6 +452,36 @@ if (refreshed) {
 }
 ```
 
+## Examples
+
+### Next.js Card Search (`examples/next-search`)
+
+A full-stack web application built with Next.js 15 and Tailwind CSS that demonstrates the SDK in a server-side rendered context. Features a card search interface with fuzzy matching, filters (color, rarity, type, set, format legality), card detail pages, and responsive image grids powered by Scryfall.
+
+**SDK features demonstrated:**
+
+| Feature | SDK Method |
+|---------|-----------|
+| Fuzzy card search with filters | `sdk.cards.search({ fuzzyName, colors, rarity, types, setCode, legalIn })` |
+| Total result count with pagination | `sdk.cards.count()` |
+| Random cards on the home page | `sdk.cards.random()` |
+| Card detail lookup | `sdk.cards.getByUuid()` |
+| All printings across sets | `sdk.cards.getPrintings()` |
+| Cross-system identifier lookup | `sdk.identifiers.getIdentifiers()` |
+| Format legality table | `sdk.legalities.formatsForCard()` |
+| Retail price data by provider | `sdk.prices.today()` |
+| Set list for autocomplete filter | `sdk.sets.list()` |
+| Data version attribution | `sdk.meta` |
+
+```bash
+cd examples/next-search
+bun install
+bun run dev
+# Open http://localhost:3000
+```
+
+> **Note:** The SDK must be built first (`bun run build` in the repo root). First page load downloads parquet data from the MTGJSON CDN (~30s cold start), subsequent loads use the local cache.
+
 ## Architecture
 
 ```
