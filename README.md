@@ -1,6 +1,17 @@
 # mtgjson-sdk
 
-A DuckDB-backed TypeScript query client for [MTGJSON](https://mtgjson.com) card data. Auto-downloads Parquet data from the MTGJSON CDN and exposes the full Magic: The Gathering dataset through a fully-typed async API.
+A high-performance, DuckDB-backed TypeScript query client for [MTGJSON](https://mtgjson.com).
+
+Unlike traditional SDKs that rely on rate-limited REST APIs, `mtgjson-sdk` implements a local data warehouse architecture. It synchronizes optimized Parquet data from the MTGJSON CDN to your local machine, utilizing DuckDB to execute complex analytics, fuzzy searches, and booster simulations with sub-millisecond latency.
+
+## Key Features
+
+*   **Vectorized Execution**: Powered by DuckDB for high-speed OLAP queries on the full MTG dataset.
+*   **Offline-First**: Data is cached locally, allowing for full functionality without an active internet connection.
+*   **Fuzzy Search**: Built-in Jaro-Winkler similarity matching to handle typos and approximate name lookups.
+*   **Fully Async**: Native async/await API with `Symbol.asyncDispose` for automatic resource cleanup.
+*   **Fully Typed**: Complete TypeScript type definitions for all query results and parameters.
+*   **Booster Simulation**: Accurate pack opening logic using official MTGJSON weights and sheet configurations.
 
 ## Install
 
@@ -39,9 +50,18 @@ const rows = await sdk.sql("SELECT name, manaValue FROM cards WHERE manaValue = 
 await sdk.close();
 ```
 
+## Architecture
+
+By using DuckDB, the SDK leverages columnar storage and vectorized execution, making it significantly faster than SQLite or standard JSON parsing for MTG's relational dataset.
+
+1.  **Synchronization**: On first use, the SDK lazily downloads Parquet and JSON files from the MTGJSON CDN to a platform-specific cache directory (`~/.cache/mtgjson-sdk` on Linux, `~/Library/Caches/mtgjson-sdk` on macOS, `AppData/Local/mtgjson-sdk` on Windows).
+2.  **Virtual Schema**: DuckDB views are registered on-demand. Accessing `sdk.cards` registers the card view; accessing `sdk.prices` registers price data. You only pay the memory cost for the data you query.
+3.  **Dynamic Adaptation**: The SDK introspects Parquet metadata to automatically handle schema changes, plural-column array conversion, and format legality unpivoting.
+4.  **Materialization**: Queries return fully-typed TypeScript interfaces for individual record ergonomics, or raw `Record<string, unknown>` objects for flexible consumption.
+
 ## Use Cases
 
-### Price Tracking
+### Price Analytics
 
 ```typescript
 const sdk = await MtgjsonSDK.create();
@@ -72,12 +92,14 @@ if (cheapest) {
 await sdk.close();
 ```
 
-### Deck Building Helper
+### Advanced Card Search
+
+The `search()` method supports ~20 composable filters that can be combined freely:
 
 ```typescript
 const sdk = await MtgjsonSDK.create();
 
-// Find modern-legal red creatures with CMC <= 2
+// Complex filters: Modern-legal red creatures with CMC <= 2
 const aggroCreatures = await sdk.cards.search({
   colors: ["R"],
   types: "Creature",
@@ -86,20 +108,21 @@ const aggroCreatures = await sdk.cards.search({
   limit: 50,
 });
 
-// Check what's banned
-const banned = await sdk.legalities.bannedIn("modern");
-console.log(`${banned.length} cards banned in Modern`);
+// Typo-tolerant fuzzy search (Jaro-Winkler similarity)
+const results = await sdk.cards.search({
+  fuzzyName: "Ligtning Bolt", // still finds it!
+});
 
-// Search by keyword ability
+// Rules text search using regular expressions
+const burn = await sdk.cards.search({
+  textRegex: "deals? \\d+ damage to any target",
+});
+
+// Search by keyword ability across formats
 const flyers = await sdk.cards.search({
   keyword: "Flying",
   colors: ["W", "U"],
   legalIn: "standard",
-});
-
-// Fuzzy search -- handles typos
-const results = await sdk.cards.search({
-  fuzzyName: "Ligtning Bolt", // still finds it!
 });
 
 // Find cards by foreign-language name
@@ -110,19 +133,54 @@ const blitz = await sdk.cards.search({
 await sdk.close();
 ```
 
-### Collection Management
+<details>
+<summary>All <code>search()</code> parameters</summary>
+
+| Parameter | Type | Description |
+|---|---|---|
+| `name` | `string` | Name pattern (`%` = wildcard) |
+| `fuzzyName` | `string` | Typo-tolerant Jaro-Winkler match |
+| `localizedName` | `string` | Foreign-language name search |
+| `colors` | `string[]` | Cards containing these colors |
+| `colorIdentity` | `string[]` | Color identity filter |
+| `legalIn` | `string` | Format legality |
+| `rarity` | `string` | Rarity filter |
+| `manaValue` | `number` | Exact mana value |
+| `manaValueLte` | `number` | Mana value upper bound |
+| `manaValueGte` | `number` | Mana value lower bound |
+| `text` | `string` | Rules text substring |
+| `textRegex` | `string` | Rules text regex |
+| `types` | `string` | Type line search |
+| `artist` | `string` | Artist name |
+| `keyword` | `string` | Keyword ability |
+| `isPromo` | `boolean` | Promo status |
+| `availability` | `string` | `"paper"` or `"mtgo"` |
+| `language` | `string` | Language filter |
+| `layout` | `string` | Card layout |
+| `setCode` | `string` | Set code |
+| `setType` | `string` | Set type (joins sets table) |
+| `power` | `string` | Power filter |
+| `toughness` | `string` | Toughness filter |
+| `limit` / `offset` | `number` | Pagination |
+
+</details>
+
+### Collection & Cross-Reference
 
 ```typescript
 const sdk = await MtgjsonSDK.create();
 
-// Cross-reference by Scryfall ID
+// Cross-reference by any external ID system
 const cards = await sdk.identifiers.findByScryfallId("f7a21fe4-...");
-
-// Look up by TCGPlayer product ID
 const tcgCards = await sdk.identifiers.findByTcgplayerId("12345");
+const mtgoCards = await sdk.identifiers.findByMtgoId("67890");
 
-// Get all identifiers for a card (Scryfall, TCGPlayer, MTGO, Arena, etc.)
+// Get all external identifiers for a card
 const allIds = await sdk.identifiers.getIdentifiers("card-uuid-here");
+// -> Scryfall, TCGPlayer, MTGO, Arena, Cardmarket, Card Kingdom, Cardsphere, ...
+
+// TCGPlayer SKU variants (foil, etched, etc.)
+const skus = await sdk.skus.get("card-uuid-here");
 
 // Export to a standalone DuckDB file for offline analysis
 await sdk.exportDb("my_collection.duckdb");
@@ -131,12 +189,12 @@ await sdk.exportDb("my_collection.duckdb");
 await sdk.close();
 ```
 
-### Booster Pack Simulation
+### Booster Simulation
 
 ```typescript
 const sdk = await MtgjsonSDK.create();
 
-// See what booster types are available
+// See available booster types for a set
 const types = await sdk.booster.availableTypes("MH3"); // ["draft", "collector", ...]
 
 // Open a single draft pack
@@ -155,180 +213,117 @@ await sdk.close();
 
 ## API Reference
 
-### Cards
+### Core Data
 
 ```typescript
-await sdk.cards.getByUuid("uuid")                     // -> CardSet | null
-await sdk.cards.getByUuids(["uuid1", "uuid2"])        // -> CardSet[]
-await sdk.cards.getByName("Lightning Bolt")           // -> CardSet[]
-await sdk.cards.getByName("Lightning Bolt", { setCode: "A25" })
-await sdk.cards.search({
-  name: "Lightning%",              // name pattern (% = wildcard)
-  fuzzyName: "Ligtning Bolt",     // typo-tolerant (Jaro-Winkler)
-  localizedName: "Blitzschlag",   // foreign-language name search
-  colors: ["R"],                   // cards containing these colors
-  colorIdentity: ["R", "U"],      // filter by color identity
-  legalIn: "modern",              // format legality
-  rarity: "rare",                 // rarity filter
-  manaValue: 1.0,                 // exact mana value
-  manaValueLte: 3.0,             // mana value range
-  manaValueGte: 1.0,
-  text: "damage",                 // rules text search
-  textRegex: "deals? \\d+ damage",// regex rules text search
-  types: "Creature",              // type line search
-  artist: "Christopher Moeller",  // artist name search
-  keyword: "Flying",              // keyword ability
-  isPromo: false,                 // promo status
-  availability: "paper",          // paper, mtgo
-  language: "English",            // language filter
-  layout: "normal",               // card layout
-  setCode: "MH3",                // filter by set
-  setType: "expansion",           // set type (joins sets table)
-  power: "3",                     // P/T filter
-  toughness: "3",
-  limit: 100,                     // pagination
-  offset: 0,
-})                                                     // -> CardSet[]
+// Cards
+await sdk.cards.getByUuid("uuid")                     // single card lookup
+await sdk.cards.getByUuids(["uuid1", "uuid2"])        // batch lookup
+await sdk.cards.getByName("Lightning Bolt")           // all printings of a name
+await sdk.cards.search({...})                         // composable filters (see above)
 await sdk.cards.getPrintings("Lightning Bolt")         // all printings across sets
 await sdk.cards.getAtomic("Lightning Bolt")            // oracle data (no printing info)
-await sdk.cards.getAtomic("Fire")                      // works with face names (split/MDFC)
-await sdk.cards.findByScryfallId("...")                // cross-reference
+await sdk.cards.findByScryfallId("...")                // cross-reference shortcut
 await sdk.cards.random(5)                              // random cards
-await sdk.cards.count()                                // total count
-await sdk.cards.count({ setCode: "MH3", rarity: "rare" })  // filtered count
-```
+await sdk.cards.count()                                // total (or filtered with kwargs)
 
-### Tokens
-
-```typescript
-await sdk.tokens.getByUuid("uuid")                    // -> CardToken | null
-await sdk.tokens.getByName("Soldier")                 // -> CardToken[]
-await sdk.tokens.search({
-  name: "%Token", setCode: "MH3", colors: ["W"],
-})
-await sdk.tokens.forSet("MH3")                        // all tokens for a set
+// Tokens
+await sdk.tokens.getByUuid("uuid")
+await sdk.tokens.getByName("Soldier")
+await sdk.tokens.search({ name: "%Token", setCode: "MH3", colors: ["W"] })
+await sdk.tokens.forSet("MH3")
 await sdk.tokens.count()
-```
 
-### Sets
-
-```typescript
-await sdk.sets.get("MH3")                             // -> SetList | null
-await sdk.sets.list({ setType: "expansion" })          // -> SetList[]
-await sdk.sets.search({
-  name: "Horizons", releaseYear: 2024,
-})
-await sdk.sets.getFinancialSummary("MH3", {            // -> financial stats
-  provider: "tcgplayer",
-  currency: "USD",
-  finish: "normal",
-  category: "retail",
-})
+// Sets
+await sdk.sets.get("MH3")
+await sdk.sets.list({ setType: "expansion" })
+await sdk.sets.search({ name: "Horizons", releaseYear: 2024 })
+await sdk.sets.getFinancialSummary("MH3", { provider: "tcgplayer" })
 await sdk.sets.count()
 ```
 
-### Identifiers
+### Playability
 
 ```typescript
-await sdk.identifiers.findByScryfallId("...")
-await sdk.identifiers.findByTcgplayerId("...")
-await sdk.identifiers.findByMtgoId("...")
-await sdk.identifiers.findByMtgoFoilId("...")
-await sdk.identifiers.findByMtgArenaId("...")
-await sdk.identifiers.findByMultiverseId("...")
-await sdk.identifiers.findByMcmId("...")
-await sdk.identifiers.findByMcmMetaId("...")
-await sdk.identifiers.findByCardKingdomId("...")
-await sdk.identifiers.findByCardKingdomFoilId("...")
-await sdk.identifiers.findByCardKingdomEtchedId("...")
-await sdk.identifiers.findByCardsphereId("...")
-await sdk.identifiers.findByCardsphereFoilId("...")
-await sdk.identifiers.findByScryfallOracleId("...")
-await sdk.identifiers.findByScryfallIllustrationId("...")
-await sdk.identifiers.findByTcgplayerEtchedId("...")
-await sdk.identifiers.findBy("scryfallId", "...")      // generic lookup
-await sdk.identifiers.getIdentifiers("uuid")           // all IDs for a card
-```
-
-### Legalities
-
-```typescript
+// Legalities
 await sdk.legalities.formatsForCard("uuid")            // -> { modern: "Legal", ... }
 await sdk.legalities.legalIn("modern")                 // all modern-legal cards
 await sdk.legalities.isLegal("uuid", "modern")         // -> boolean
-await sdk.legalities.bannedIn("modern")                // banned cards
-await sdk.legalities.restrictedIn("vintage")           // restricted cards
-await sdk.legalities.suspendedIn("historic")           // suspended cards
-await sdk.legalities.notLegalIn("standard")            // not-legal cards
-```
+await sdk.legalities.bannedIn("modern")                // also: restrictedIn, suspendedIn
 
-### Prices
-
-```typescript
-await sdk.prices.get("uuid")                           // full nested price data
-await sdk.prices.today("uuid", {                       // latest prices
-  provider: "tcgplayer", finish: "foil",
-})
-await sdk.prices.history("uuid", {                     // historical prices
-  provider: "tcgplayer",
-  dateFrom: "2024-01-01",
-  dateTo: "2024-12-31",
-})
-await sdk.prices.priceTrend("uuid")                    // min/max/avg statistics
-await sdk.prices.cheapestPrinting("Lightning Bolt")    // cheapest printing by name
-await sdk.prices.cheapestPrintings({ limit: 10 })      // N cheapest cards overall
-await sdk.prices.mostExpensivePrintings({ limit: 10 }) // most expensive cards
-```
-
-### Decks
-
-```typescript
+// Decks & Sealed Products
 await sdk.decks.list({ setCode: "MH3" })
 await sdk.decks.search({ name: "Eldrazi" })
 await sdk.decks.count()
-```
-
-### Sealed Products
-
-```typescript
 await sdk.sealed.list({ setCode: "MH3" })
 await sdk.sealed.get("uuid")
 ```
 
-### SKUs
+### Market & Identifiers
 
 ```typescript
-await sdk.skus.get("uuid")                             // TCGPlayer SKUs for a card
+// Prices
+await sdk.prices.get("uuid")                           // full nested price data
+await sdk.prices.today("uuid", { provider: "tcgplayer", finish: "foil" })
+await sdk.prices.history("uuid", { provider: "tcgplayer", dateFrom: "2024-01-01" })
+await sdk.prices.priceTrend("uuid")                    // min/max/avg statistics
+await sdk.prices.cheapestPrinting("Lightning Bolt")
+await sdk.prices.mostExpensivePrintings({ limit: 10 })
+
+// Identifiers (supports all major external ID systems)
+await sdk.identifiers.findByScryfallId("...")
+await sdk.identifiers.findByTcgplayerId("...")
+await sdk.identifiers.findByMtgoId("...")
+await sdk.identifiers.findByMtgArenaId("...")
+await sdk.identifiers.findByMultiverseId("...")
+await sdk.identifiers.findByMcmId("...")
+await sdk.identifiers.findByCardKingdomId("...")
+await sdk.identifiers.findBy("scryfallId", "...")      // generic lookup
+await sdk.identifiers.getIdentifiers("uuid")           // all IDs for a card
+
+// SKUs
+await sdk.skus.get("uuid")
 await sdk.skus.findBySkuId(123456)
 await sdk.skus.findByProductId(789)
 ```
 
-### Booster Simulation
+### Booster & Enums
 
 ```typescript
-await sdk.booster.availableTypes("MH3")                // -> string[]
-await sdk.booster.openPack("MH3", "draft")             // -> CardSet[]
-await sdk.booster.openBox("MH3", "draft", 36)          // -> CardSet[][]
-await sdk.booster.sheetContents("MH3", "draft", "common")  // card weights
+await sdk.booster.availableTypes("MH3")
+await sdk.booster.openPack("MH3", "draft")
+await sdk.booster.openBox("MH3", "draft", 36)
+await sdk.booster.sheetContents("MH3", "draft", "common")
+
+await sdk.enums.keywords()
+await sdk.enums.cardTypes()
+await sdk.enums.enumValues()
 ```
 
-### Enums
+### System
 
 ```typescript
-await sdk.enums.keywords()                             // -> Keywords
-await sdk.enums.cardTypes()                            // -> CardTypes
-await sdk.enums.enumValues()                           // all enum values
-```
-
-### Metadata & Utilities
-
-```typescript
-await sdk.meta                                         // -> Record<string, unknown>
-sdk.views                                              // -> string[]
-await sdk.refresh()                                    // check for new data -> boolean
-await sdk.sql("SELECT ...", [param1, param2])          // raw parameterized SQL ($1, $2, ...)
+await sdk.meta                                         // version and build date
+sdk.views                                              // registered view names
+await sdk.refresh()                                    // check CDN for new data -> boolean
 await sdk.exportDb("output.duckdb")                    // export to persistent DuckDB file
+await sdk.sql(query, params)                           // raw parameterized SQL
 await sdk.close()                                      // release resources
+```
+
+## Performance and Memory
+
+When querying large datasets (thousands of cards), use raw SQL to avoid materializing large arrays of typed objects in memory.
+
+```typescript
+// Use raw SQL for bulk analysis
+const stats = await sdk.sql(`
+  SELECT setCode, COUNT(*) as card_count, AVG(manaValue) as avg_cmc
+  FROM cards
+  GROUP BY setCode
+  ORDER BY card_count DESC
+  LIMIT 10
+`);
 ```
 
 ## Advanced Usage
@@ -340,7 +335,6 @@ The SDK uses an async factory since DuckDB initialization is asynchronous:
 ```typescript
 import { MtgjsonSDK } from "mtgjson-sdk";
 
-// Create with custom options
 const sdk = await MtgjsonSDK.create({
   cacheDir: "/data/mtgjson-cache",
   offline: false,
@@ -367,24 +361,31 @@ The SDK supports `Symbol.asyncDispose` for automatic cleanup with `await using`:
 }
 ```
 
-### Database Export
+### Auto-Refresh for Long-Running Services
 
-Export all loaded data to a standalone DuckDB file that can be queried without the SDK:
+```typescript
+// In a scheduled task or health check:
+const refreshed = await sdk.refresh();
+if (refreshed) {
+  console.log("New MTGJSON data detected -- cache refreshed");
+}
+```
+
+### Raw SQL
+
+All user input goes through DuckDB parameter binding (`$1`, `$2`, ...):
 
 ```typescript
 const sdk = await MtgjsonSDK.create();
 
-// Touch the query modules you want exported
+// Ensure views are registered before querying
 await sdk.cards.count();
-await sdk.sets.count();
 
-// Export to file
-await sdk.exportDb("mtgjson.duckdb");
-
-// Now use it standalone:
-// $ duckdb mtgjson.duckdb "SELECT name, setCode FROM cards LIMIT 10"
-
-await sdk.close();
+// Parameterized queries
+const rows = await sdk.sql(
+  "SELECT name, setCode, rarity FROM cards WHERE manaValue <= $1 AND rarity = $2",
+  [2, "mythic"]
+);
 ```
 
 ### Web API Example
@@ -412,44 +413,6 @@ process.on("SIGTERM", async () => {
 });
 
 app.listen(3000, () => console.log("Listening on :3000"));
-```
-
-### Raw SQL
-
-All user input goes through DuckDB parameter binding (`$1`, `$2`, ...) to prevent SQL injection:
-
-```typescript
-const sdk = await MtgjsonSDK.create();
-
-// Ensure views are registered before querying
-await sdk.cards.count();
-
-// Parameterized queries
-const rows = await sdk.sql(
-  "SELECT name, setCode, rarity FROM cards WHERE manaValue <= $1 AND rarity = $2",
-  [2, "mythic"]
-);
-
-// Complex analytics
-const stats = await sdk.sql(`
-  SELECT setCode, COUNT(*) as card_count, AVG(manaValue) as avg_cmc
-  FROM cards
-  GROUP BY setCode
-  ORDER BY card_count DESC
-  LIMIT 10
-`);
-```
-
-### Auto-Refresh for Long-Running Services
-
-The `refresh()` method checks the CDN for new MTGJSON releases. If a newer version is available, it clears internal state so the next query re-downloads fresh data:
-
-```typescript
-// In a scheduled task or health check:
-const refreshed = await sdk.refresh();
-if (refreshed) {
-  console.log("New MTGJSON data detected -- cache refreshed");
-}
 ```
 
 ## Examples
@@ -482,71 +445,15 @@ bun run dev
 
 > **Note:** The SDK must be built first (`bun run build` in the repo root). First page load downloads parquet data from the MTGJSON CDN (~30s cold start), subsequent loads use the local cache.
 
-## Architecture
-
-```
-MTGJSON CDN (Parquet + JSON files)
-        |
-        | auto-download on first access
-        v
-Local Cache (platform-specific directory)
-        |
-        | lazy view registration
-        v
-DuckDB In-Memory Database
-        |
-        | parameterized SQL queries
-        v
-Typed TypeScript API (interfaces / Record<string, unknown>)
-```
-
-**How it works:**
-
-1. **Auto-download**: On first use, the SDK downloads ~15 Parquet files and ~7 JSON files from the MTGJSON CDN to a platform-specific cache directory (`~/.cache/mtgjson-sdk` on Linux, `~/Library/Caches/mtgjson-sdk` on macOS, `AppData/Local/mtgjson-sdk` on Windows).
-
-2. **Lazy loading**: DuckDB views are registered on-demand -- accessing `sdk.cards` triggers the cards view, `sdk.prices` triggers price data loading, etc. Only the data you use gets loaded into memory.
-
-3. **Schema adaptation**: The SDK auto-detects array columns in parquet files using a hybrid heuristic (static baseline + dynamic plural detection + blocklist), so it adapts to upstream MTGJSON schema changes without code updates.
-
-4. **Legality UNPIVOT**: Format legality columns are dynamically detected from the parquet schema and UNPIVOTed to `(uuid, format, status)` rows -- automatically scales to new formats.
-
-5. **Price flattening**: Deeply nested JSON price data is streamed to NDJSON and bulk-loaded into DuckDB, minimizing memory overhead.
-
 ## Development
-
-### Prerequisites
-
-- Node.js 18+ or [Bun](https://bun.sh)
-- TypeScript 5+
-
-### Setup
 
 ```bash
 git clone https://github.com/the-muppet2/mtgjson-sdk-typescript.git
 cd mtgjson-sdk-typescript
 bun install
-```
-
-### Building
-
-```bash
 bun run build
 bun run typecheck
-```
-
-### Running Tests
-
-```bash
-# Unit tests (no network required)
 bun test
-
-# Watch mode
-bun test --watch
-```
-
-### Linting
-
-```bash
 bun run lint
 bun run format
 ```
