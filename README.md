@@ -1,6 +1,10 @@
 # mtgjson-sdk
 
-A high-performance, DuckDB-backed TypeScript query client for [MTGJSON](https://mtgjson.com).
+[![npm](https://img.shields.io/npm/v/mtgjson-sdk)](https://www.npmjs.com/package/mtgjson-sdk)
+[![Node](https://img.shields.io/node/v/mtgjson-sdk)](https://www.npmjs.com/package/mtgjson-sdk)
+[![License](https://img.shields.io/npm/l/mtgjson-sdk)](https://www.npmjs.com/package/mtgjson-sdk)
+
+The official MTGJSON TypeScript SDK — a high-performance, DuckDB-backed query client for [MTGJSON](https://mtgjson.com).
 
 Unlike traditional SDKs that rely on rate-limited REST APIs, `mtgjson-sdk` implements a local data warehouse architecture. It synchronizes optimized Parquet data from the MTGJSON CDN to your local machine, utilizing DuckDB to execute complex analytics, fuzzy searches, and booster simulations with sub-millisecond latency.
 

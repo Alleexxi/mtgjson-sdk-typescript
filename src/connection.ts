@@ -327,12 +327,20 @@ function coerceValues(val: unknown): unknown {
 			return (obj.items as unknown[]).map(coerceValues);
 		}
 		// DuckDB DATE type comes back as { days: number } (days since Unix epoch)
-		if ("days" in obj && typeof obj.days === "number" && Object.keys(obj).length === 1) {
+		if (
+			"days" in obj &&
+			typeof obj.days === "number" &&
+			Object.keys(obj).length === 1
+		) {
 			const ms = (obj.days as number) * 86400000;
 			return new Date(ms).toISOString().slice(0, 10);
 		}
 		// DuckDB TIMESTAMP type comes back as { micros: bigint }
-		if ("micros" in obj && typeof obj.micros === "bigint" && Object.keys(obj).length === 1) {
+		if (
+			"micros" in obj &&
+			typeof obj.micros === "bigint" &&
+			Object.keys(obj).length === 1
+		) {
 			const ms = Number(obj.micros / 1000n);
 			return new Date(ms).toISOString();
 		}

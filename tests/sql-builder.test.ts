@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
 import { DuckDBInstance } from "@duckdb/node-api";
+import { describe, expect, it } from "vitest";
 import { SQLBuilder } from "../src/sql-builder.js";
 
 describe("SQLBuilder", () => {

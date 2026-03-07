@@ -6,10 +6,8 @@ export default defineConfig({
     testTimeout: 30_000,
     fileParallelism: false,
     pool: "forks",
-    poolOptions: {
-      forks: {
-        execArgv: [],
-      },
+    forks: {
+      execArgv: [],
     },
   },
 });

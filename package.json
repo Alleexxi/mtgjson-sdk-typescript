@@ -1,7 +1,7 @@
 {
   "name": "mtgjson-sdk",
-  "version": "0.1.0",
-  "description": "DuckDB-backed query client for MTGJSON card data",
+  "version": "0.1.1",
+  "description": "The official MTGJSON TypeScript SDK — a DuckDB-backed query client for MTGJSON card data",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -19,21 +19,21 @@
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
-    "test": "bun test",
-    "test:watch": "bun test --watch",
+    "test": "vitest run",
+    "test:watch": "vitest --watch",
     "lint": "biome check src/ tests/",
     "lint:fix": "biome check --fix src/ tests/",
     "format": "biome format --write src/ tests/"
   },
   "dependencies": {
-    "@duckdb/node-api": "1.4.4-r.1"
+    "@duckdb/node-api": "1.4.4-r.3"
   },
   "devDependencies": {
-    "@biomejs/biome": "^1.9.0",
-    "@types/node": "^25.3.0",
-    "tsup": "^8.0.0",
-    "typescript": "^5.7.0",
-    "vitest": "^3.0.0"
+    "@biomejs/biome": "^2.4.6",
+    "@types/node": "^25.3.5",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
   },
   "keywords": [
     "mtg",

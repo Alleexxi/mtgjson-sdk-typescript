@@ -1,6 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { MtgjsonSDK } from "../src/client.js";
-import { Connection } from "../src/connection.js";
 import { createTestSdk } from "./setup.js";
 
 let sdk: MtgjsonSDK;

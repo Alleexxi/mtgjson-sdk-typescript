@@ -1,5 +1,4 @@
-import { createWriteStream } from "node:fs";
-import { existsSync } from "node:fs";
+import { createWriteStream, existsSync } from "node:fs";
 import {
 	mkdir,
 	readFile,
@@ -10,14 +9,13 @@ import {
 } from "node:fs/promises";
 import { get as httpsGet } from "node:https";
 import { join } from "node:path";
-import { pipeline } from "node:stream/promises";
 import { createGunzip } from "node:zlib";
 import {
 	CDN_BASE,
+	defaultCacheDir,
 	JSON_FILES,
 	META_URL,
 	PARQUET_FILES,
-	defaultCacheDir,
 } from "./config.js";
 
 export type ProgressCallback = (

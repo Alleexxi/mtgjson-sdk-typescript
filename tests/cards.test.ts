@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Connection } from "../src/connection.js";
 import { CardQuery } from "../src/queries/cards.js";
 import { createTestConnection } from "./setup.js";

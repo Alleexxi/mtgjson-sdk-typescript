@@ -1,10 +1,10 @@
 export { CardQuery } from "./cards.js";
-export { SetQuery } from "./sets.js";
-export { TokenQuery } from "./tokens.js";
-export { PriceQuery } from "./prices.js";
-export { LegalityQuery } from "./legalities.js";
-export { IdentifierQuery } from "./identifiers.js";
 export { DeckQuery } from "./decks.js";
-export { SealedQuery } from "./sealed.js";
-export { SkuQuery } from "./skus.js";
 export { EnumQuery } from "./enums.js";
+export { IdentifierQuery } from "./identifiers.js";
+export { LegalityQuery } from "./legalities.js";
+export { PriceQuery } from "./prices.js";
+export { SealedQuery } from "./sealed.js";
+export { SetQuery } from "./sets.js";
+export { SkuQuery } from "./skus.js";
+export { TokenQuery } from "./tokens.js";
