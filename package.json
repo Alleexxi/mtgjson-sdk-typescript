@@ -45,6 +45,10 @@
   "engines": {
     "node": ">=22"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mtgjson/mtgjson-sdk-typescript.git"
+  },
   "author": "Zachary Halpern <zach@mtgjson.com>",
   "license": "MIT"
 }

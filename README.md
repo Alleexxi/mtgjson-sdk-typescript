@@ -19,7 +19,9 @@ Unlike traditional SDKs that rely on rate-limited REST APIs, `mtgjson-sdk` imple
 
 ## Install
 
-TODO: NPM STUFF
+```bash
+npm install mtgjson-sdk
+```
 
 ## Quick Start
 
@@ -442,24 +444,24 @@ A full-stack web application built with Next.js 15 and Tailwind CSS that demonst
 
 ```bash
 cd examples/next-search
-bun install
-bun run dev
+npm install
+npm run dev
 # Open http://localhost:3000
 ```
 
-> **Note:** The SDK must be built first (`bun run build` in the repo root). First page load downloads parquet data from the MTGJSON CDN (~30s cold start), subsequent loads use the local cache.
+> **Note:** The SDK must be built first (`npm run build` in the repo root). First page load downloads parquet data from the MTGJSON CDN (~30s cold start), subsequent loads use the local cache.
 
 ## Development
 
 ```bash
-git clone https://github.com/the-muppet2/mtgjson-sdk-typescript.git
+git clone https://github.com/mtgjson/mtgjson-sdk-typescript.git
 cd mtgjson-sdk-typescript
-bun install
-bun run build
-bun run typecheck
-bun test
-bun run lint
-bun run format
+npm install
+npm run build
+npm run typecheck
+npm test
+npm run lint
+npm run format
 ```
 
 ## License
