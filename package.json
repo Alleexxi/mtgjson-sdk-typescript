@@ -42,6 +42,9 @@
     "duckdb",
     "sdk"
   ],
+  "engines": {
+    "node": ">=22"
+  },
   "author": "Zachary Halpern <zach@mtgjson.com>",
   "license": "MIT"
 }
