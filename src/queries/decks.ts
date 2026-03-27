@@ -1,67 +1,88 @@
-import type { CacheManager } from "../cache.js";
-import type { DeckList } from "../types/index.js";
+import type { Connection } from "../connection.js";
+import { SQLBuilder } from "../sql-builder.js";
 
 export class DeckQuery {
-	private _cache: CacheManager;
-	private _data: Record<string, unknown>[] | null = null;
+	private _conn: Connection;
 
-	constructor(cache: CacheManager) {
-		this._cache = cache;
+	constructor(conn: Connection) {
+		this._conn = conn;
 	}
 
 	private async _ensure(): Promise<void> {
-		if (this._data !== null) return;
-		try {
-			const raw = await this._cache.loadJson("deck_list");
-			this._data = (raw.data as Record<string, unknown>[]) ?? [];
-		} catch {
-			this._data = [];
-		}
+		await this._conn.ensureViews("set_decks");
 	}
 
 	async list(options?: {
 		setCode?: string;
 		deckType?: string;
-	}): Promise<DeckList[]> {
+		name?: string;
+		namePartialSearch?: boolean;
+	}): Promise<Record<string, unknown>[]> {
 		await this._ensure();
-		let results = this._data!;
 
-		if (options?.setCode) {
-			const codeUpper = options.setCode.toUpperCase();
-			results = results.filter(
-				(d) => ((d.code as string) ?? "").toUpperCase() === codeUpper,
-			);
+		try {
+			const q = new SQLBuilder("set_decks");
+			q.select("*");
+
+			if (options?.setCode) {
+				q.whereEq("setCode", options.setCode.toUpperCase());
+			}
+
+			if (options?.deckType) {
+				q.whereEq("type", options.deckType);
+			}
+			
+			if (options?.name) {
+				if (options?.namePartialSearch) {
+					q.whereLike("name", `%${options.name}%`);
+				} else {
+					q.whereEq("name", options.name);
+				}
+			}
+
+			const [sql, params] = q.build();
+			const rows = await this._conn.execute(sql, params);
+
+			const decks: Record<string, unknown>[] = [];
+			for (const row of rows) {
+				const deck = row as Record<string, unknown>;
+
+				const jsonFields = ["sealedProductUuids", "sourceSetCodes", "mainBoard", "sideBoard", "commander", "displayCommander", "tokens", "planes", "schemes", "identifiers", "purchaseUrls"];
+				for (const field of jsonFields) {
+					if (typeof deck[field] === "string") {
+						try {
+							deck[field] = JSON.parse(deck[field] as string);
+						} catch {
+						}
+					} else if (Array.isArray(deck[field])) {
+						try {
+							const joined = (deck[field] as string[]).join("");
+							deck[field] = JSON.parse(joined);
+						} catch {
+						}
+					}
+				}
+
+				decks.push(deck);
+			}
+
+			return decks;
+		} catch (error) {
+			return [];
 		}
-		if (options?.deckType) {
-			results = results.filter((d) => d.type === options.deckType);
-		}
-		return results as DeckList[];
 	}
 
 	async search(options?: {
 		name?: string;
 		setCode?: string;
-	}): Promise<DeckList[]> {
+	}): Promise<Record<string, unknown>[]> {
 		await this._ensure();
-		let results = this._data!;
-
-		if (options?.name) {
-			const nameLower = options.name.toLowerCase();
-			results = results.filter((d) =>
-				((d.name as string) ?? "").toLowerCase().includes(nameLower),
-			);
-		}
-		if (options?.setCode) {
-			const codeUpper = options.setCode.toUpperCase();
-			results = results.filter(
-				(d) => ((d.code as string) ?? "").toUpperCase() === codeUpper,
-			);
-		}
-		return results as DeckList[];
+		return await this.list({ ...options, namePartialSearch: true });
 	}
 
 	async count(): Promise<number> {
 		await this._ensure();
-		return this._data!.length;
+		const allDecks = await this.list();
+		return allDecks.length;
 	}
 }

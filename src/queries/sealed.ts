@@ -9,22 +9,28 @@ export class SealedQuery {
 	}
 
 	private async _ensure(): Promise<void> {
-		await this._conn.ensureViews("sets");
+		await this._conn.ensureViews("sealed_products");
 	}
 
 	async list(options?: {
 		setCode?: string;
 		category?: string;
 		limit?: number;
+		uuid?: string;
 	}): Promise<Record<string, unknown>[]> {
 		await this._ensure();
 		try {
-			const q = new SQLBuilder("sets");
-			q.select("code", "name AS setName", "sealedProduct");
+			const q = new SQLBuilder("sealed_products");
+			q.select("*");
 
 			if (options?.setCode) {
-				q.whereEq("code", options.setCode.toUpperCase());
+				q.whereEq("setCode", options.setCode.toUpperCase());
 			}
+
+			if (options?.uuid) {
+				q.whereEq("uuid", options.uuid);
+			}
+
 			q.limit(options?.limit ?? 100);
 
 			const [sql, params] = q.build();
@@ -32,22 +38,43 @@ export class SealedQuery {
 
 			const products: Record<string, unknown>[] = [];
 			for (const row of rows) {
-				const sealed = row.sealedProduct;
-				if (sealed && Array.isArray(sealed)) {
-					for (const sp of sealed) {
-						if (sp && typeof sp === "object") {
-							const product = sp as Record<string, unknown>;
-							if (options?.category && product.category !== options.category) {
-								continue;
-							}
-							product.setCode = row.code;
-							products.push(product);
-						}
+				if (options?.category && row.category !== options.category) {
+					continue;
+				}
+
+				const product = row as Record<string, unknown>;
+				let sealed: unknown = undefined;
+
+				if (!row.contents) {
+					sealed = undefined;
+				} else if (Array.isArray(row.contents)) {
+					const joined = row.contents.join("");
+					sealed = typeof joined === "string" ? JSON.parse(joined) : row.contents;
+				} else {
+					sealed = row.contents;
+				}
+
+				product.contents = sealed
+
+				if (typeof product.identifiers === "string") {
+					try {
+						product.identifiers = JSON.parse(product.identifiers);
+					} catch {
 					}
 				}
+
+				if (typeof product.purchaseUrls === "string") {
+					try {
+						product.purchaseUrls = JSON.parse(product.purchaseUrls);
+					} catch {
+					}
+				}
+
+				products.push(product);
 			}
+
 			return products;
-		} catch {
+		} catch (error) {
 			return [];
 		}
 	}
@@ -55,20 +82,11 @@ export class SealedQuery {
 	async get(uuid: string): Promise<Record<string, unknown> | null> {
 		await this._ensure();
 		try {
-			const sql =
-				"SELECT sub.code AS setCode, sub.sp " +
-				"FROM (" +
-				"  SELECT code, UNNEST(sealedProduct) AS sp " +
-				"  FROM sets WHERE sealedProduct IS NOT NULL" +
-				") sub " +
-				"WHERE sub.sp.uuid = $1 " +
-				"LIMIT 1";
-			const rows = await this._conn.execute(sql, [uuid]);
-			if (rows.length === 0) return null;
-			const row = rows[0];
-			const product = (row.sp ?? {}) as Record<string, unknown>;
+			const products = await this.list({uuid: uuid})
+			if (products.length === 0) return null;
+
+			const product = products[0]
 			if (typeof product === "object") {
-				product.setCode = row.setCode;
 				return product;
 			}
 			return null;

@@ -69,7 +69,7 @@ export class MtgjsonSDK {
 	}
 
 	get decks(): DeckQuery {
-		if (!this._decks) this._decks = new DeckQuery(this._cache);
+		if (!this._decks) this._decks = new DeckQuery(this._conn);
 		return this._decks;
 	}
 
