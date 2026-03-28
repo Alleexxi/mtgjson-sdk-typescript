@@ -30,6 +30,7 @@ export class CacheManager {
 	readonly timeout: number;
 	private _remoteVersion: string | null = null;
 	private _onProgress: ProgressCallback | null;
+	private _inFlight = new Map<string, Promise<string>>();
 
 	constructor(options?: {
 		cacheDir?: string;
@@ -181,9 +182,21 @@ export class CacheManager {
 					`Parquet file ${filename} not cached and offline mode is enabled`,
 				);
 			}
-			await this._downloadFile(filename, localPath);
-			const version = await this.remoteVersion();
-			if (version) await this._saveVersion(version);
+			const existing = this._inFlight.get(filename);
+			if (existing) return existing;
+
+			const promise = (async () => {
+				await this._downloadFile(filename, localPath);
+				const version = await this.remoteVersion();
+				if (version) await this._saveVersion(version);
+				return localPath;
+			})();
+			this._inFlight.set(filename, promise);
+			try {
+				return await promise;
+			} finally {
+				this._inFlight.delete(filename);
+			}
 		}
 		return localPath;
 	}
@@ -200,9 +213,21 @@ export class CacheManager {
 					`JSON file ${filename} not cached and offline mode is enabled`,
 				);
 			}
-			await this._downloadFile(filename, localPath);
-			const version = await this.remoteVersion();
-			if (version) await this._saveVersion(version);
+			const existing = this._inFlight.get(filename);
+			if (existing) return existing;
+
+			const promise = (async () => {
+				await this._downloadFile(filename, localPath);
+				const version = await this.remoteVersion();
+				if (version) await this._saveVersion(version);
+				return localPath;
+			})();
+			this._inFlight.set(filename, promise);
+			try {
+				return await promise;
+			} finally {
+				this._inFlight.delete(filename);
+			}
 		}
 		return localPath;
 	}
