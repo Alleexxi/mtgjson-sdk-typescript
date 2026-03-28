@@ -570,6 +570,7 @@ export type CardDeck = {
 // === Set Models ===
 
 export type DeckSet = {
+	setCode: string;
 	code: string;
 	commander?: CardSetDeck[];
 	displayCommander?: CardSetDeck[];

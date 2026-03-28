@@ -100,7 +100,13 @@ export class CardQuery {
 		if (opts.artist) q.whereLike("artist", `%${opts.artist}%`);
 		if (opts.language) q.whereEq("language", opts.language);
 		if (opts.layout) q.whereEq("layout", opts.layout);
-		if (opts.isPromo !== undefined) q.whereEq("isPromo", opts.isPromo);
+		if (opts.isPromo !== undefined) {
+			if (opts.isPromo) {
+				q.whereEq("isPromo", true);
+			} else {
+				q._where.push("(isPromo IS NULL OR isPromo = false)");
+			}
+		}
 
 		if (opts.colors) {
 			for (const color of opts.colors) {

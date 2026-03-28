@@ -1,7 +1,7 @@
 {
   "name": "mtgjson-sdk",
   "version": "0.1.1",
-  "description": "The official MTGJSON TypeScript SDK — a DuckDB-backed query client for MTGJSON card data",
+  "description": "The official MTGJSON TypeScript SDK - a DuckDB-backed query client for MTGJSON card data",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -49,6 +49,12 @@
     "type": "git",
     "url": "https://github.com/mtgjson/mtgjson-sdk-typescript.git"
   },
-  "author": "Zachary Halpern <zach@mtgjson.com>",
+  "author": "Robert Pratt <mtgmuppet@gmail.com>",
+  "contributors": [
+    "Zachary Halpern <zach@mtgjson.com>"
+  ],
+  "maintainers": [
+    "Zachary Halpern <zach@mtgjson.com>"
+  ],
   "license": "MIT"
 }

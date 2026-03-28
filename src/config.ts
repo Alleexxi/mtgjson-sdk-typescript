@@ -28,6 +28,9 @@ export const PARQUET_FILES: Record<string, string> = {
 	all_prices_today: "parquet/AllPricesToday.parquet",
 	all_prices: "parquet/AllPrices.parquet",
 	tcgplayer_skus: "parquet/TcgplayerSkus.parquet",
+	// Sealed products and decks
+	sealed_products: "parquet/sealedProducts.parquet",
+	set_decks: "parquet/setDecks.parquet",
 };
 
 /** Mapping of logical data names to CDN JSON file paths. */
