@@ -1043,7 +1043,7 @@ async function main(): Promise<boolean> {
 
 	// ══════════════════════════════════════════════════════════
 	//  DECKS — DeckQuery (3 methods)
-	//  Downloads DeckList.json
+	//  Uses setDecks.parquet
 	// ══════════════════════════════════════════════════════════
 	section("Decks");
 
@@ -1063,10 +1063,10 @@ async function main(): Promise<boolean> {
 		if (deckList.length > 0) {
 			// list — setCode filter
 			const firstDeck = deckList[0] as Record<string, unknown>;
-			const firstCode = firstDeck.code as string;
-			if (firstCode) {
-				const decksBySet = await sdk.decks.list({ setCode: firstCode });
-				check("decks.list setCode", decksBySet.length > 0, `set=${firstCode}`);
+			const firstSetCode = firstDeck.setCode as string;
+			if (firstSetCode) {
+				const decksBySet = await sdk.decks.list({ setCode: firstSetCode });
+				check("decks.list setCode", decksBySet.length > 0, `set=${firstSetCode}`);
 			}
 
 			// list — deckType filter
@@ -1095,9 +1095,9 @@ async function main(): Promise<boolean> {
 			}
 
 			// search — setCode
-			if (firstCode) {
+			if (firstSetCode) {
 				const deckSearchSet = await sdk.decks.search({
-					setCode: firstCode,
+					setCode: firstSetCode,
 				});
 				check("decks.search setCode", deckSearchSet.length > 0);
 			}
@@ -1212,6 +1212,7 @@ async function main(): Promise<boolean> {
 
 	// ══════════════════════════════════════════════════════════
 	//  SEALED — SealedQuery (2 methods)
+	//  Uses sealedProducts.parquet
 	// ══════════════════════════════════════════════════════════
 	section("Sealed Products");
 
@@ -1224,11 +1225,11 @@ async function main(): Promise<boolean> {
 	);
 
 	// list — setCode filter
-	const sealedMh3 = await sdk.sealed.list({ setCode: "MH3" });
+	const sealedBySet = await sdk.sealed.list({ setCode: "MH3" });
 	check(
 		"sealed.list setCode=MH3",
-		Array.isArray(sealedMh3),
-		`found ${sealedMh3.length}`,
+		Array.isArray(sealedBySet),
+		`found ${sealedBySet.length}`,
 	);
 
 	// list — category filter
@@ -1239,13 +1240,43 @@ async function main(): Promise<boolean> {
 		`found ${sealedCat.length}`,
 	);
 
+	// Validate data shape on first product (if available)
+	if (sealedAll.length > 0) {
+		const sp = sealedAll[0] as Record<string, unknown>;
+		check("sealed has uuid", typeof sp.uuid === "string");
+		check("sealed has name", typeof sp.name === "string");
+		check("sealed has setCode", typeof sp.setCode === "string");
+		check("sealed has category", typeof sp.category === "string");
+		check(
+			"sealed identifiers is object",
+			typeof sp.identifiers === "object" && sp.identifiers !== null,
+			`type=${typeof sp.identifiers}`,
+		);
+		check(
+			"sealed purchaseUrls is object",
+			typeof sp.purchaseUrls === "object" && sp.purchaseUrls !== null,
+			`type=${typeof sp.purchaseUrls}`,
+		);
+
+		// get by uuid
+		const realUuid = sp.uuid as string;
+		const sealedItem = await sdk.sealed.get(realUuid);
+		check(
+			"sealed.get by uuid",
+			sealedItem !== null && sealedItem.uuid === realUuid,
+			`uuid=${realUuid}`,
+		);
+	} else {
+		skip("sealed data validation", "no sealed products loaded");
+	}
+
 	// get — nonexistent uuid
-	const sealedItem = await sdk.sealed.get(
+	const sealedMissing = await sdk.sealed.get(
 		"00000000-0000-0000-0000-000000000000",
 	);
 	check(
-		"sealed.get (graceful)",
-		sealedItem === null || typeof sealedItem === "object",
+		"sealed.get nonexistent returns null",
+		sealedMissing === null,
 	);
 
 	// ══════════════════════════════════════════════════════════
@@ -1417,10 +1448,28 @@ async function main(): Promise<boolean> {
 		const deckListAll = await sdk.decks.list();
 		if (deckListAll.length > 0) {
 			const d = deckListAll[0] as Record<string, unknown>;
-			check("deck has code", Boolean(d.code));
-			check("deck has name", Boolean(d.name));
-			check("deck has type", Boolean(d.type));
-			check("deck has fileName", Boolean(d.fileName));
+			check("deck has code", typeof d.code === "string");
+			check("deck has name", typeof d.name === "string");
+			check("deck has type", typeof d.type === "string");
+
+			// setCode and board fields are available when using setDecks.parquet
+			if ("setCode" in d) {
+				check("deck has setCode", typeof d.setCode === "string");
+				check("deck has releaseDate", typeof d.releaseDate === "string");
+				check(
+					"deck mainBoard is array",
+					Array.isArray(d.mainBoard),
+					`type=${typeof d.mainBoard}`,
+				);
+				check(
+					"deck sideBoard is array",
+					Array.isArray(d.sideBoard),
+					`type=${typeof d.sideBoard}`,
+				);
+			} else {
+				// DeckList.json data shape
+				check("deck has fileName", typeof d.fileName === "string");
+			}
 		}
 	} catch {
 		skip("deck model validation", "deck data not loaded");

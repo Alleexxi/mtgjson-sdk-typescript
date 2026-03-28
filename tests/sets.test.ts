@@ -55,8 +55,9 @@ describe("SetQuery", () => {
 		expect(total).toBe(2);
 	});
 
-	it("financial summary returns null without prices", async () => {
-		const summary = await sets.getFinancialSummary("A25");
-		expect(summary).toBeNull();
+	it("financial summary throws without price data in offline mode", async () => {
+		await expect(sets.getFinancialSummary("A25")).rejects.toThrow(
+			"not cached and offline mode is enabled",
+		);
 	});
 });
