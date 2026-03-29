@@ -72,6 +72,13 @@ const IGNORED_COLUMNS = new Set([
 	"format",
 	"uris",
 	"scryfallUri",
+	// sealed_products / set_decks: JSON strings, not CSV lists
+	"contents",
+	"tokens",
+	"planes",
+	"schemes",
+	"sealedProductUuids",
+	"sourceSetCodes",
 ]);
 
 /** VARCHAR columns containing JSON strings to cast to DuckDB JSON type. */
@@ -85,6 +92,17 @@ const JSON_CAST_COLUMNS = new Set([
 	"sourceProducts",
 	"foreignData",
 	"translations",
+	// sealed_products / set_decks
+	"contents",
+	"tokens",
+	"planes",
+	"schemes",
+	"sealedProductUuids",
+	"sourceSetCodes",
+	"mainBoard",
+	"sideBoard",
+	"commander",
+	"displayCommander",
 ]);
 
 export class Connection {
@@ -349,6 +367,16 @@ function coerceValues(val: unknown): unknown {
 			out[k] = coerceValues(v);
 		}
 		return out;
+	}
+	if (typeof val === "string") {
+		const ch = val.charAt(0);
+		if (ch === "{" || ch === "[") {
+			try {
+				return JSON.parse(val);
+			} catch {
+				// not valid JSON, return as-is
+			}
+		}
 	}
 	return val;
 }

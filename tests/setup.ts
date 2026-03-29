@@ -8,6 +8,8 @@ import {
 	SAMPLE_FOREIGN_DATA,
 	SAMPLE_IDENTIFIERS,
 	SAMPLE_LEGALITIES,
+	SAMPLE_SEALED_PRODUCTS,
+	SAMPLE_SET_DECKS,
 	SAMPLE_SETS,
 	SAMPLE_TOKENS,
 } from "./fixtures.js";
@@ -28,6 +30,8 @@ export async function createTestConnection(): Promise<Connection> {
 	await conn.registerTableFromData("card_identifiers", SAMPLE_IDENTIFIERS);
 	await conn.registerTableFromData("card_legalities", SAMPLE_LEGALITIES);
 	await conn.registerTableFromData("card_foreign_data", SAMPLE_FOREIGN_DATA);
+	await conn.registerTableFromData("sealed_products", SAMPLE_SEALED_PRODUCTS);
+	await conn.registerTableFromData("set_decks", SAMPLE_SET_DECKS);
 
 	return conn;
 }
@@ -48,6 +52,8 @@ export async function createTestSdk(): Promise<MtgjsonSDK> {
 	await conn.registerTableFromData("card_identifiers", SAMPLE_IDENTIFIERS);
 	await conn.registerTableFromData("card_legalities", SAMPLE_LEGALITIES);
 	await conn.registerTableFromData("card_foreign_data", SAMPLE_FOREIGN_DATA);
+	await conn.registerTableFromData("sealed_products", SAMPLE_SEALED_PRODUCTS);
+	await conn.registerTableFromData("set_decks", SAMPLE_SET_DECKS);
 
 	return sdk;
 }
