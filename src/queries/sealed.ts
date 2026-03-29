@@ -1,5 +1,6 @@
 import type { Connection } from "../connection.js";
 import { SQLBuilder } from "../sql-builder.js";
+import type { SealedProduct } from "../types/index.js";
 
 export class SealedQuery {
 	private _conn: Connection;
@@ -17,7 +18,7 @@ export class SealedQuery {
 		category?: string;
 		limit?: number;
 		uuid?: string;
-	}): Promise<Record<string, unknown>[]> {
+	}): Promise<SealedProduct[]> {
 		await this._ensure();
 		try {
 			const q = new SQLBuilder("sealed_products");
@@ -25,6 +26,10 @@ export class SealedQuery {
 
 			if (options?.setCode) {
 				q.whereEq("setCode", options.setCode.toUpperCase());
+			}
+
+			if (options?.category) {
+				q.whereEq("category", options.category);
 			}
 
 			if (options?.uuid) {
@@ -36,56 +41,20 @@ export class SealedQuery {
 			const [sql, params] = q.build();
 			const rows = await this._conn.execute(sql, params);
 
-			const products: Record<string, unknown>[] = [];
-			for (const row of rows) {
-				if (options?.category && row.category !== options.category) {
-					continue;
-				}
-
-				const product = row as Record<string, unknown>;
-				let sealed: unknown = undefined;
-
-				if (!row.contents) {
-					sealed = undefined;
-				} else if (Array.isArray(row.contents)) {
-					const joined = row.contents.join("");
-					sealed = typeof joined === "string" ? JSON.parse(joined) : row.contents;
-				} else {
-					sealed = row.contents;
-				}
-
-				product.contents = sealed
-
-				if (typeof product.identifiers === "string") {
-					try {
-						product.identifiers = JSON.parse(product.identifiers);
-					} catch {
-					}
-				}
-
-				if (typeof product.purchaseUrls === "string") {
-					try {
-						product.purchaseUrls = JSON.parse(product.purchaseUrls);
-					} catch {
-					}
-				}
-
-				products.push(product);
-			}
-
+			const products = rows.map((row) => row as SealedProduct);
 			return products;
-		} catch (error) {
+		} catch {
 			return [];
 		}
 	}
 
-	async get(uuid: string): Promise<Record<string, unknown> | null> {
+	async get(uuid: string): Promise<SealedProduct | null> {
 		await this._ensure();
 		try {
-			const products = await this.list({uuid: uuid})
+			const products = await this.list({ uuid: uuid });
 			if (products.length === 0) return null;
 
-			const product = products[0]
+			const product = products[0];
 			if (typeof product === "object") {
 				return product;
 			}
