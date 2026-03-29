@@ -1,5 +1,6 @@
 import type { Connection } from "../connection.js";
 import { SQLBuilder } from "../sql-builder.js";
+import type { SealedProduct } from "../types/index.js";
 
 export class SealedQuery {
 	private _conn: Connection;
@@ -9,66 +10,52 @@ export class SealedQuery {
 	}
 
 	private async _ensure(): Promise<void> {
-		await this._conn.ensureViews("sets");
+		await this._conn.ensureViews("sealed_products");
 	}
 
 	async list(options?: {
 		setCode?: string;
 		category?: string;
 		limit?: number;
-	}): Promise<Record<string, unknown>[]> {
+		uuid?: string;
+	}): Promise<SealedProduct[]> {
 		await this._ensure();
 		try {
-			const q = new SQLBuilder("sets");
-			q.select("code", "name AS setName", "sealedProduct");
+			const q = new SQLBuilder("sealed_products");
+			q.select("*");
 
 			if (options?.setCode) {
-				q.whereEq("code", options.setCode.toUpperCase());
+				q.whereEq("setCode", options.setCode.toUpperCase());
 			}
+
+			if (options?.category) {
+				q.whereEq("category", options.category);
+			}
+
+			if (options?.uuid) {
+				q.whereEq("uuid", options.uuid);
+			}
+
 			q.limit(options?.limit ?? 100);
 
 			const [sql, params] = q.build();
 			const rows = await this._conn.execute(sql, params);
 
-			const products: Record<string, unknown>[] = [];
-			for (const row of rows) {
-				const sealed = row.sealedProduct;
-				if (sealed && Array.isArray(sealed)) {
-					for (const sp of sealed) {
-						if (sp && typeof sp === "object") {
-							const product = sp as Record<string, unknown>;
-							if (options?.category && product.category !== options.category) {
-								continue;
-							}
-							product.setCode = row.code;
-							products.push(product);
-						}
-					}
-				}
-			}
+			const products = rows.map((row) => row as SealedProduct);
 			return products;
 		} catch {
 			return [];
 		}
 	}
 
-	async get(uuid: string): Promise<Record<string, unknown> | null> {
+	async get(uuid: string): Promise<SealedProduct | null> {
 		await this._ensure();
 		try {
-			const sql =
-				"SELECT sub.code AS setCode, sub.sp " +
-				"FROM (" +
-				"  SELECT code, UNNEST(sealedProduct) AS sp " +
-				"  FROM sets WHERE sealedProduct IS NOT NULL" +
-				") sub " +
-				"WHERE sub.sp.uuid = $1 " +
-				"LIMIT 1";
-			const rows = await this._conn.execute(sql, [uuid]);
-			if (rows.length === 0) return null;
-			const row = rows[0];
-			const product = (row.sp ?? {}) as Record<string, unknown>;
+			const products = await this.list({ uuid: uuid });
+			if (products.length === 0) return null;
+
+			const product = products[0];
 			if (typeof product === "object") {
-				product.setCode = row.setCode;
 				return product;
 			}
 			return null;

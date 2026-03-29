@@ -1,67 +1,87 @@
-import type { CacheManager } from "../cache.js";
-import type { DeckList } from "../types/index.js";
+import type { Connection } from "../connection.js";
+import { SQLBuilder } from "../sql-builder.js";
+import type { DeckSet } from "../types/index.js";
 
 export class DeckQuery {
-	private _cache: CacheManager;
-	private _data: Record<string, unknown>[] | null = null;
+	private _conn: Connection;
 
-	constructor(cache: CacheManager) {
-		this._cache = cache;
+	constructor(conn: Connection) {
+		this._conn = conn;
 	}
 
 	private async _ensure(): Promise<void> {
-		if (this._data !== null) return;
-		try {
-			const raw = await this._cache.loadJson("deck_list");
-			this._data = (raw.data as Record<string, unknown>[]) ?? [];
-		} catch {
-			this._data = [];
-		}
+		await this._conn.ensureViews("set_decks");
 	}
 
 	async list(options?: {
 		setCode?: string;
 		deckType?: string;
-	}): Promise<DeckList[]> {
+		limit?: number;
+		name?: string;
+	}): Promise<DeckSet[]> {
 		await this._ensure();
-		let results = this._data!;
 
-		if (options?.setCode) {
-			const codeUpper = options.setCode.toUpperCase();
-			results = results.filter(
-				(d) => ((d.code as string) ?? "").toUpperCase() === codeUpper,
-			);
+		try {
+			const q = new SQLBuilder("set_decks");
+			q.select("*");
+
+			if (options?.setCode) {
+				q.whereEq("setCode", options.setCode.toUpperCase());
+			}
+
+			if (options?.deckType) {
+				q.whereEq("type", options.deckType);
+			}
+
+			if (options?.name) {
+				q.whereEq("name", options.name);
+			}
+
+			q.limit(options?.limit ?? 100);
+
+			const [sql, params] = q.build();
+			const rows = await this._conn.execute(sql, params);
+
+			const decks = rows.map((row) => row as DeckSet);
+			return decks;
+		} catch {
+			return [];
 		}
-		if (options?.deckType) {
-			results = results.filter((d) => d.type === options.deckType);
-		}
-		return results as DeckList[];
 	}
 
 	async search(options?: {
 		name?: string;
 		setCode?: string;
-	}): Promise<DeckList[]> {
+	}): Promise<DeckSet[]> {
 		await this._ensure();
-		let results = this._data!;
 
-		if (options?.name) {
-			const nameLower = options.name.toLowerCase();
-			results = results.filter((d) =>
-				((d.name as string) ?? "").toLowerCase().includes(nameLower),
-			);
+		try {
+			const q = new SQLBuilder("set_decks");
+			q.select("*");
+
+			if (options?.setCode) {
+				q.whereEq("setCode", options.setCode.toUpperCase());
+			}
+
+			if (options?.name) {
+				q.whereLike("name", `%${options.name}%`);
+			}
+
+			const [sql, params] = q.build();
+			const rows = await this._conn.execute(sql, params);
+
+			const decks = rows.map((row) => row as DeckSet);
+			return decks;
+		} catch {
+			return [];
 		}
-		if (options?.setCode) {
-			const codeUpper = options.setCode.toUpperCase();
-			results = results.filter(
-				(d) => ((d.code as string) ?? "").toUpperCase() === codeUpper,
-			);
-		}
-		return results as DeckList[];
 	}
 
 	async count(): Promise<number> {
 		await this._ensure();
-		return this._data!.length;
+		const result = await this._conn.executeScalar(
+			"SELECT COUNT(*) FROM set_decks",
+		);
+		return (result as number) ?? 0;
 	}
 }

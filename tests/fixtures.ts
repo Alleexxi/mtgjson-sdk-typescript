@@ -545,7 +545,8 @@ export const SAMPLE_SEALED_PRODUCTS = [
 		setCode: "A25",
 		cardCount: 15,
 		category: "booster_pack",
-		contents: '{"card":[{"name":"Lightning Bolt","set":"A25","uuid":"card-uuid-001"}]}',
+		contents:
+			'{"card":[{"name":"Lightning Bolt","set":"A25","uuid":"card-uuid-001"}]}',
 		identifiers: '{"tcgplayerProductId":"162584"}',
 		name: "Masters 25 Booster Pack",
 		productSize: 15,
@@ -578,7 +579,8 @@ export const SAMPLE_SET_DECKS = [
 		releaseDate: "2018-03-16",
 		sealedProductUuids: '["sealed-uuid-001"]',
 		sourceSetCodes: '["A25"]',
-		mainBoard: '[{"uuid":"card-uuid-001","count":4},{"uuid":"card-uuid-003","count":2}]',
+		mainBoard:
+			'[{"uuid":"card-uuid-001","count":4},{"uuid":"card-uuid-003","count":2}]',
 		sideBoard: '[{"uuid":"card-uuid-002","count":1}]',
 		commander: "[]",
 		displayCommander: "[]",
