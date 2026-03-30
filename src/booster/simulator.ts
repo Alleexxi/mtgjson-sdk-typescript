@@ -130,6 +130,12 @@ export class BoosterSimulator {
 		}
 	}
 
+	async getBoosterData(
+        setCode: string,
+    ): Promise<Record<string, BoosterConfig> | null> {
+        return this._getBoosterConfig(setCode);
+    }
+	
 	async availableTypes(setCode: string): Promise<string[]> {
 		await this._ensure();
 		const rows = await this._conn.execute(
